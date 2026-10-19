@@ -1,0 +1,11 @@
+{
+  "name": "ambertheory-bca-learning",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/validate.mjs",
+    "test": "node scripts/validate.mjs",
+    "start": "node scripts/serve.mjs"
+  }
+}
