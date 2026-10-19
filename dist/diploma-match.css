@@ -31,6 +31,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 .studio-subject-dropdown a{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:9px;font-size:12px;font-weight:750;text-decoration:none;color:#344054}
 .studio-subject-dropdown a:hover{background:#f5f2ff;color:#493ab0}
 .studio-subject-dropdown a.current{color:#fff;background:#6652d9}
+.studio-subject-dropdown a.current small{color:#ede8ff}
 .studio-subject-dropdown small{font-size:9px;color:#7a8394;margin-left:8px}
 .studio-strip-link{font-size:11px;font-weight:800;color:#5743c7;text-decoration:none}
 .studio-strip-link:hover{text-decoration:underline}

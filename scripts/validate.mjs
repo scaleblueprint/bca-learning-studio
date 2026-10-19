@@ -33,7 +33,17 @@ assert.equal(getLessons(curriculum.find(c=>c.id==='dbms-lab')).length,12);
 assert.equal(getLessons(curriculum.find(c=>c.id==='ai-lab')).length,16);
 assert.equal(curriculum.filter(c=>c.semester===3&&c.elective).length,2);
 assert.equal(curriculum.filter(c=>c.semester===4&&c.elective).length,2);
-for(const name of ['index.html','styles.css','app.js','curriculum.js','lessons.js','labs.js']){assert(readFileSync(new URL(`../dist/${name}`,import.meta.url),'utf8').length>100)}
+for(const name of ['index.html','styles.css','diploma-match.css','app.js','curriculum.js','lessons.js','labs.js']){assert(readFileSync(new URL(`../dist/${name}`,import.meta.url),'utf8').length>100)}
+const experience=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8');
+const theme=readFileSync(new URL('../dist/diploma-match.css',import.meta.url),'utf8');
+const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+for(const token of ['studio-sem-tile','studio-subject-grid','studio-subjects','studio-unit','studio-topic-canvas','topic-theory','topic-diagram','topic-practice','topic-industry','topic-quiz','topic-exam','topic-lab','topic-code','topic-viva']){
+  assert(experience.includes(token),`Missing shared Diploma UX feature: ${token}`);
+}
+for(const token of ['#111318','#6c5ce7','#22c7e8','.studio-header','.studio-unit-banner','.studio-subject-dropdown']){
+  assert(theme.includes(token),`Missing Diploma visual token: ${token}`);
+}
+assert(html.includes('diploma-match.css'),'Shared visual theme is not linked from index.html');
 const ready=lessons.length+labLessons.length;
 console.log(`PASS: ${curriculum.length} subjects (incl. electives and outline-only), ${allLessons.length} mapped topics/experiments, ${lessons.length} authored theory lessons, ${labLessons.length} authored labs.`);
 console.log(`Content honesty: ${allLessons.length-ready} syllabus items awaiting full authoring; all are distinguished in UI.`);

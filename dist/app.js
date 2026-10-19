@@ -28,7 +28,7 @@ function layout(body,mode='home',course=null){
       <div class="studio-subject-dropdown"><h4>${semLabel(course.semester)} subjects</h4>
       ${curriculum.filter(c=>c.semester===course.semester&&c.syllabusAvailable).map(c=>`<a href="${firstReadyPath(c)}" class="${c.id===course.id?'current':''}"><span>${esc(c.title)}</span><small>${c.kind==='lab'?'Lab':c.elective?'Elective':'Theory'}</small></a>`).join('')}
       <h4>Other semesters</h4><a href="#/semester/${course.semester===3?4:3}">Browse Semester ${course.semester===3?'IV':'III'} →</a></div>
-    </details><a class="studio-strip-link" href="#/semester/${course.semester}">← ${semLabel(course.semester)} subjects</a>
+    </details>
   </div>`:'';
   app.innerHTML=`<div class="app-shell"><header class="studio-header"><div class="studio-header-main">
     <a class="studio-logo" href="https://ambertheory-home.onrender.com/#ventures" aria-label="Back to AmberTheory"><img src="https://ambertheory-home.onrender.com/ambertheory-lockup.jpg" alt="AmberTheory" /></a>
@@ -115,13 +115,14 @@ function viewCourse(id,ui,ti){
     }).join('')}</div></aside>`;
   const status=authored?'Authored · faculty review pending':'Syllabus mapped · lesson pending';
   const next=lessonsForCourse[idx+1],prev=lessonsForCourse[idx-1];
+  const unitHeading=current.unitName.replace(/^Unit\s+[IVX]+\s*·\s*/i,'');
   const reader=`<main class="main-content"><div class="studio-reader-topline">
       <div><a href="#/semester/${c.semester}">${esc(c.title)}</a><span>›</span><span>${esc(current.unitName)}</span><span>›</span><b>${c.kind==='lab'?'Experiment':'Topic'} ${idx+1}</b></div>
       <div class="studio-topic-progress"><span>${c.kind==='lab'?'Experiment':'Topic'} ${idx+1} of ${lessonsForCourse.length}</span><i style="--progress:${100*(idx+1)/lessonsForCourse.length}%"></i>
         <button class="btn small" type="button" data-action="toggle-side">${sideClosed?'Show':'Hide'} contents</button></div></div>
     <div class="studio-next-top">${next?`<a class="studio-next-card" href="${path(c.id,next.unit,next.index)}"><small>NEXT ${c.kind==='lab'?'EXPERIMENT':'TOPIC'} →</small>${esc(next.name)}<small>${esc(c.units[next.unit].name)}</small></a>`:''}</div>
     <div class="studio-unit-banner"><span class="studio-unit-badge">${c.kind==='lab'?'Section':'Unit'} ${ui+1}</span>
-      <div><small>Current ${c.kind==='lab'?'section':'unit'}</small><h2>${esc(current.unitName)}</h2></div></div>
+      <div><small>Current ${c.kind==='lab'?'section':'unit'}</small><h2>${esc(unitHeading)}</h2></div></div>
     <article class="studio-topic-canvas"><div class="studio-topic-title"><span class="studio-topic-tag">${c.kind==='lab'?'Experiment':'Topic'} ${current.index+1}</span>
       <h1>${esc(current.name)}</h1></div><div class="studio-status">${status} · ${c.kind==='lab'?'Practical lab':'Textbook theory'}</div>
       ${authored?(c.kind==='lab'?renderLab(current,authored):renderTheory(current,authored)):renderPending(current,c)}
