@@ -16,6 +16,7 @@ const grouped = (s,k) => curriculum.filter(c=>c.semester===s&&c.kind===k);
 const count = c => getLessons(c).filter(l=>progress[l.id]).length;
 const readyFor = l => (l.kind==='lab'?labByKey:lessonByKey)[`${l.courseId}|${l.name}`];
 const tally = c => {const items=getLessons(c);return [count(c),items.length,items.filter(x=>readyFor(x)).length]};
+const firstReadyPath = c => {const first=getLessons(c).find(readyFor);return first?path(c.id,first.unit,first.index):path(c.id,0,0)};
 const semLabel = s => `Semester ${s===3?'III':s===4?'IV':s}`;
 
 function layout(body,mode='home'){
@@ -44,7 +45,7 @@ function subjectGroup(label,courses,extra=''){
   if(!courses.length)return '';
   return `<section class="subject-group"><div class="group-heading">${label}</div>${extra?`<p class="muted smalltext">${esc(extra)}</p>`:''}<div class="subject-list">${courses.map(c=>{
     const [done,total,ready]=tally(c),unavailable=!c.syllabusAvailable;
-    return `<a class="subject-link" href="${unavailable?'#':'#/c/'+c.id+'/0/0'}" ${unavailable?'data-action="unavailable"':''}><div><div class="subject-name">${esc(c.title)}</div><p>${unavailable?'Listed by university · detailed syllabus not supplied':`${c.units.length} ${c.kind==='lab'?'sections':'units'} · ${total} mapped ${c.kind==='lab'?'experiments':'topics'} · ${ready} authored · ${done} completed`}</p></div><span class="pill ${c.kind==='lab'?'labs':unavailable?'draft':''}">${unavailable?'Awaiting syllabus':c.kind==='lab'?'Practical':c.elective?'Elective':'Theory'}</span><span class="subject-arrow">→</span></a>`;
+    return `<a class="subject-link" href="${unavailable?'#':firstReadyPath(c)}" ${unavailable?'data-action="unavailable"':''}><div><div class="subject-name">${esc(c.title)}</div><p>${unavailable?'Listed by university · detailed syllabus not supplied':`${c.units.length} ${c.kind==='lab'?'sections':'units'} · ${total} mapped ${c.kind==='lab'?'experiments':'topics'} · ${ready} authored · ${done} completed`}</p></div><span class="pill ${c.kind==='lab'?'labs':unavailable?'draft':''}">${unavailable?'Awaiting syllabus':c.kind==='lab'?'Practical':c.elective?'Elective':'Theory'}</span><span class="subject-arrow">→</span></a>`;
   }).join('')}</div></section>`;
 }
 
