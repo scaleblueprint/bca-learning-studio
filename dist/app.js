@@ -4,62 +4,91 @@ import {labByKey,labLessons} from './labs.js';
 
 const app = document.querySelector('#app');
 const KEY = 'ambertheory-bca-progress-v1';
+const VIEWED = 'ambertheory-bca-viewed-v1';
 const FEEDBACK = 'ambertheory-bca-feedback-v1';
 const load = (k,fallback) => {try{return JSON.parse(localStorage.getItem(k))||fallback}catch{return fallback}};
 const store = (k,v) => {try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
-let progress = load(KEY,{}), feedback = load(FEEDBACK,{});
+let progress = load(KEY,{}), viewed = load(VIEWED,{}), feedback = load(FEEDBACK,{});
 let tab='theory', query='', sideClosed=false, mobileOpen=false, answers={}, revealed={}, runWorker=null, runTimer=null, step=0;
 const esc = x => String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt = x => esc(x).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
 const path = (c,ui=0,ti=0) => `#/c/${c}/${ui}/${ti}`;
 const grouped = (s,k) => curriculum.filter(c=>c.semester===s&&c.kind===k);
-const count = c => getLessons(c).filter(l=>progress[l.id]).length;
+const count = c => getLessons(c).filter(l=>viewed[l.id]||progress[l.id]).length;
 const readyFor = l => (l.kind==='lab'?labByKey:lessonByKey)[`${l.courseId}|${l.name}`];
 const tally = c => {const items=getLessons(c);return [count(c),items.length,items.filter(x=>readyFor(x)).length]};
 const firstReadyPath = c => {const first=getLessons(c).find(readyFor);return first?path(c.id,first.unit,first.index):path(c.id,0,0)};
 const semLabel = s => `Semester ${s===3?'III':s===4?'IV':s}`;
 
-function layout(body,mode='home'){
+function layout(body,mode='home',course=null){
+  const reader=mode==='reader'&&course;
   document.body.classList.toggle('sidebar-closed',sideClosed);
-  app.innerHTML=`<div class="app-shell"><header class="topbar"><div class="topbar-inner">
-    <a class="identity" href="#/" aria-label="BCA Learning home"><span class="monogram">AT</span><span class="brandname">AmberTheory<span>BCA Learning</span></span></a>
-    <nav class="topnav" aria-label="Primary navigation"><a href="#/">Home</a><a href="#/semester/3">Semester III</a><a href="#/semester/4">Semester IV</a><a class="primary-link" href="https://ambertheory-home.onrender.com/#ventures">← AmberTheory</a></nav>
-  </div></header>${body}</div>`;
+  const subjectMenu=reader?`<div class="studio-subject-strip">
+    <details class="studio-subjects"><summary>Subjects <span aria-hidden="true">▾</span></summary>
+      <div class="studio-subject-dropdown"><h4>${semLabel(course.semester)} subjects</h4>
+      ${curriculum.filter(c=>c.semester===course.semester&&c.syllabusAvailable).map(c=>`<a href="${firstReadyPath(c)}" class="${c.id===course.id?'current':''}"><span>${esc(c.title)}</span><small>${c.kind==='lab'?'Lab':c.elective?'Elective':'Theory'}</small></a>`).join('')}
+      <h4>Other semesters</h4><a href="#/semester/${course.semester===3?4:3}">Browse Semester ${course.semester===3?'IV':'III'} →</a></div>
+    </details><a class="studio-strip-link" href="#/semester/${course.semester}">← ${semLabel(course.semester)} subjects</a>
+  </div>`:'';
+  app.innerHTML=`<div class="app-shell"><header class="studio-header"><div class="studio-header-main">
+    <a class="studio-logo" href="https://ambertheory-home.onrender.com/#ventures" aria-label="Back to AmberTheory"><img src="https://ambertheory-home.onrender.com/ambertheory-lockup.jpg" alt="AmberTheory" /></a>
+    <a class="studio-amber-return" href="https://ambertheory-home.onrender.com/#ventures">← Back to AmberTheory</a>
+    ${reader?`<a class="studio-back" href="#/semester/${course.semester}">← BCA home</a>
+      <div class="studio-course-id"><small>${semLabel(course.semester)} · Bachelor of Computer Applications</small><strong>${esc(course.title)}</strong></div>
+      <button class="studio-contents-button" type="button" data-action="mobile-menu" aria-label="Open course contents">☰</button>`:''}
+  </div>${subjectMenu}</header>${body}</div>`;
 }
 
-function home(){
-  const total=allLessons.length, ready=lessons.length+labLessons.length;
-  layout(`<main class="home"><section class="hero"><div><div class="eyebrow"><span class="dot"></span> Bengaluru North University · SEP 2024</div>
-    <h1>Understand more.<br><em>Memorise less.</em></h1><p class="lead">An illustrated BCA textbook that connects foundational theory with code, real applications, practical experiments and university examinations. Select your semester to explore the actual syllabus.</p>
-    <div class="hero-actions"><a class="btn primary" href="#/semester/3">Explore Semester III <span aria-hidden="true">→</span></a><a class="btn" href="#/semester/4">Explore Semester IV</a></div></div>
-    <div class="hero-art" aria-label="Illustration of source code and connected concepts"><span class="art-label">From concept to confidence</span>
-      <div class="code-card"><div><i>// Think • trace • test</i></div><div><b>class</b> Learning {</div><div>&nbsp; curiosity = <b>true</b>;</div><div>&nbsp; practice() {</div><div>&nbsp; &nbsp; understand();</div><div>&nbsp; }</div><div>}</div>
-      <div class="art-tag">Learn deeply <span>One topic at a time ↗</span></div></div></section>
-    <section aria-labelledby="sem-title"><div class="section-head"><div><div class="eyebrow">Choose your path</div><h2 id="sem-title">Your semesters</h2></div><p class="muted smalltext">III and IV are mapped from the supplied university syllabus</p></div>
-      <div class="semester-row">${Array.from({length:6},(_,i)=>{let s=i+1,active=s===3||s===4;return `<${active?'a':'button disabled'} class="semester ${active?'active':''}" ${active?`href="#/semester/${s}"`:'type="button" aria-disabled="true"'}><span class="num">${String(s).padStart(2,'0')}</span><span><span class="sem-label">Semester ${s}</span><br><span class="status">${active?'View subjects →':'Planned'}</span></span></${active?'a':'button'}>`}).join('')}</div>
-    </section><aside class="info-bar"><p><strong>Honest content status:</strong> ${total} syllabus topics and practicals mapped. ${ready} authored lesson/lab experiences available to study now; remaining detailed chapters are in development.</p><a class="btn small" href="#/semester/3">Browse courses</a></aside>
-    <footer class="foot">Based on the 19-page BNU Semester III–IV BCA SEP document (effective from AY 2024–25). Electives are alternative choices, not a requirement to study both. Progress is stored in this browser on this device.</footer></main>`);
+const courseSummary={
+  java:'Learn Java syntax, objects, inheritance, interfaces, threading and file handling through programs.',
+  dbms:'Model information with ER diagrams, write SQL queries and understand normalization and transactions.',
+  algorithms:'Compare algorithm efficiency, trace searching and sorting, and solve graph and optimization problems.',
+  'java-lab':'Practice prescribed Java programs, classes, arrays, exceptions and threads in a dedicated lab.',
+  'dbms-lab':'Work through SQL statements, joins, views and prescribed PL/SQL experiments.',
+  iot:'Connect sensors, actuators and cloud services to understand real-world connected systems.',
+  cloud:'Explore virtual machines, service models, deployments and the infrastructure behind online services.',
+  python:'Build problem-solving skills with Python data types, functions, structures and file operations.',
+  ai:'Understand intelligent agents, search, knowledge, reasoning and practical AI applications.',
+  networks:'Understand layered networks, protocols, addressing, transmission and computer connectivity.',
+  'python-lab':'Practice Python exercises with runnable browser code, output and troubleshooting guidance.',
+  'ai-lab':'Explore prescribed AI experiments in Python, with tested examples where available.',
+  datascience:'Explore how datasets are collected, cleaned, analysed and interpreted.',
+  ml:'Understand learning methods, model evaluation and common machine-learning algorithms.'
+};
+function home(selected=3){
+  const current=Number(selected)||3,semesterCourses=curriculum.filter(c=>c.semester===current);
+  const planned=current!==3&&current!==4;
+  const blurb=current===3?'Learn Java, databases and algorithms, then explore practical work and your prescribed elective.':current===4?'Build Python, AI and networking foundations, then work through labs and your prescribed elective.':'This semester will be added when its detailed syllabus is available.';
+  const cards=semesterCourses.map((c,i)=>{
+    const [done,total,ready]=tally(c),available=c.syllabusAvailable,full=ready===total&&total>0;
+    const label=!available?'Awaiting syllabus':full?'Ready':ready?'Lessons available':'In development';
+    const kind=c.kind==='lab'?'Practical lab':c.elective?'Elective option':c.kind==='outline'?'Other curriculum component':'Theory';
+    const description=courseSummary[c.id]||(available?'Detailed learning materials will follow the prescribed syllabus.':'Listed in the university curriculum; detailed topics were not supplied.');
+    return `<article class="studio-card"><span class="studio-card-status ${!available||!ready?'planned':''}">${label}</span>
+      <div class="studio-card-copy"><small>Semester ${current} · ${kind}</small><h3>${esc(c.title)}</h3><p>${esc(description)}</p></div>
+      ${available?`<div class="studio-card-progress"><div class="studio-progress-track"><i style="width:${total?100*done/total:0}%"></i></div><span>${done}/${total} topics viewed · ${ready} authored</span></div>
+      <a class="studio-open-subject" href="${firstReadyPath(c)}"><span>${done?'Continue learning':'Open subject'}</span><b aria-hidden="true">→</b></a>`:
+      '<p class="studio-card-planned">Detailed unit breakdown awaits the college syllabus.</p>'}</article>`;
+  }).join('');
+  layout(`<main class="studio-home"><section class="studio-intro"><p class="studio-eyebrow">BCA · Bengaluru North University · SEP 2024</p>
+      <h1>Choose your semester. Then choose your subject.</h1></section>
+    <section class="studio-semesters" aria-label="Choose semester">${Array.from({length:6},(_,i)=>{
+      const s=i+1,n=curriculum.filter(c=>c.semester===s).length;
+      return `<button class="studio-sem-tile sem-${s} ${current===s?'active':''}" type="button" data-action="semester" data-semester="${s}" aria-pressed="${current===s}">
+        <div class="studio-sem-top"><span>SEM</span><span>${n?'Available':'Planned'}</span></div>
+        <div class="studio-sem-main"><strong>${String(s).padStart(2,'0')}</strong><span class="studio-sem-arrow" aria-hidden="true">↗</span></div>
+        <div class="studio-sem-bottom"><span>${n?`${n} subjects`:'Coming soon'}</span><small>${current===s?'Selected':'Open'}</small></div>
+      </button>`;
+    }).join('')}</section>
+    <section class="studio-sem-banner sem-${current} ${planned?'planned':''}" id="studio-sem-overview">
+      <div><p class="studio-eyebrow">${planned?'Future semester':'Build your computing foundation'}</p><h2>Semester ${current}</h2><p>${blurb}</p></div>
+      <div class="studio-sem-count"><strong>${planned?'—':semesterCourses.length}</strong><span>${planned?'Planned':'Subjects'}</span></div>
+    </section>
+    ${planned?'':`<section class="studio-subject-grid" aria-label="Semester ${current} subjects">${cards}</section>`}
+    <p class="studio-home-foot">The elective subjects are alternative choices; study the one prescribed by your college. Detailed lessons are individually authored and marked as available. Progress is stored in this browser on this device.</p>
+  </main>`);
 }
-
-function subjectGroup(label,courses,extra=''){
-  if(!courses.length)return '';
-  return `<section class="subject-group"><div class="group-heading">${label}</div>${extra?`<p class="muted smalltext">${esc(extra)}</p>`:''}<div class="subject-list">${courses.map(c=>{
-    const [done,total,ready]=tally(c),unavailable=!c.syllabusAvailable;
-    return `<a class="subject-link" href="${unavailable?'#':firstReadyPath(c)}" ${unavailable?'data-action="unavailable"':''}><div><div class="subject-name">${esc(c.title)}</div><p>${unavailable?'Listed by university · detailed syllabus not supplied':`${c.units.length} ${c.kind==='lab'?'sections':'units'} · ${total} mapped ${c.kind==='lab'?'experiments':'topics'} · ${ready} authored · ${done} completed`}</p></div><span class="pill ${c.kind==='lab'?'labs':unavailable?'draft':''}">${unavailable?'Awaiting syllabus':c.kind==='lab'?'Practical':c.elective?'Elective':'Theory'}</span><span class="subject-arrow">→</span></a>`;
-  }).join('')}</div></section>`;
-}
-
-function semesterView(s){
-  const k = s===3||s===4?s:3;
-  layout(`<main class="subject-page"><div class="crumbs"><a href="#/">← BCA home</a><span> / </span><span>${semLabel(k)}</span></div>
-    <div class="page-intro"><div class="eyebrow">BCA · ${semLabel(k)} </div><h1>Choose a subject</h1><p>Open a subject directly into its course contents. Explore individual topics or experiments from the left outline.</p></div>
-    ${subjectGroup('Core theory',grouped(k,'theory').filter(c=>!c.elective))}
-    ${subjectGroup('Practical laboratory',grouped(k,'lab'),'Experiments stay in their own Lab Studio, separate from theory.')}
-    ${subjectGroup('Discipline-specific elective · choose the prescribed option',curriculum.filter(c=>c.semester===k&&c.elective))}
-    ${subjectGroup('Other curriculum components',grouped(k,'outline'),'The uploaded BCA syllabus lists these subjects but does not provide their detailed units.')}
-    <div class="note gold"><p>For the 80-mark theory examination: Section A asks 10 of 12 two-mark questions; Section B asks 6 of 8 five-mark questions; Section C asks 3 of 4 ten-mark questions. This pattern comes from the supplied university document.</p></div>
-    <footer class="foot">Each core subject lists the exact units and learning objectives. A topic is labelled ready only after a complete lesson has been authored; syllabus mapping alone is not a finished textbook explanation.</footer></main>`);
-}
+function semesterView(s){home(s)}
 
 function viewCourse(id,ui,ti){
   const c=courseById[id];if(!c){location.hash='#/';return}
@@ -67,29 +96,41 @@ function viewCourse(id,ui,ti){
   const lessonsForCourse=getLessons(c), found=lessonsForCourse.find(x=>x.unit===ui&&x.index===ti), current=found||lessonsForCourse[0];
   if(!current){semesterView(c.semester);return}
   const idx=lessonsForCourse.findIndex(x=>x.id===current.id), authored=readyFor(current);
+  if(authored&&!viewed[current.id]){viewed[current.id]=true;store(VIEWED,viewed)}
   const sidebar=`<aside class="sidebar ${mobileOpen?'mobile-open':''}" aria-label="Course contents"><div class="side-top">
-    <a class="backline" href="#/semester/${c.semester}">← All semester subjects</a><div class="side-title">${esc(c.title)}</div><div class="subtitle">Course contents · ${tally(c)[0]} of ${tally(c)[1]} completed</div>
-    <div class="progress-row" style="margin-top:9px"><span style="width:${tally(c)[1]?100*tally(c)[0]/tally(c)[1]:0}%"></span></div>
+    <div class="studio-side-eyebrow">${esc(c.title)}</div><h2 class="studio-side-heading">Course contents</h2>
+    <div class="studio-side-progress"><small>${tally(c)[0]} / ${tally(c)[1]} topics viewed</small>
+      <div class="progress-row"><span style="width:${tally(c)[1]?100*tally(c)[0]/tally(c)[1]:0}%"></span></div></div>
     <input class="course-search" id="course-search" aria-label="Filter course topics" placeholder="Find a topic..." value="${esc(query)}" /></div>
     <div class="side-content" id="outline">${c.units.map((u,i)=>{
       const matches=u.topics.map((t,j)=>({t,j})).filter(x=>!query||x.t.toLowerCase().includes(query.toLowerCase())||u.name.toLowerCase().includes(query.toLowerCase()));
-      return matches.length?`<div class="unit-label">${esc(u.name)}</div>${matches.map(({t,j})=>{
-        let a=getLessons(c).find(l=>l.unit===i&&l.index===j),ready=!!readyFor(a);
-        return `<a class="topic-link ${ready?'ready':''} ${progress[a.id]?'complete':''} ${a.id===current.id?'selected':''}" href="${path(c.id,i,j)}"><span class="mark"></span><span>${esc(t)}</span></a>`;
-      }).join('')}`:''
+      const unitViewed=lessonsForCourse.filter(l=>l.unit===i&&(viewed[l.id]||progress[l.id])).length;
+      return matches.length?`<details class="studio-unit" ${i===ui||query?'open':''}><summary><span class="studio-unit-number">${i+1}</span>
+        <span class="studio-unit-title">${esc(u.name)}<small>${unitViewed}/${u.topics.length} viewed</small></span><span class="studio-unit-chevron" aria-hidden="true">+</span></summary>
+        <div class="studio-unit-topics">${matches.map(({t,j})=>{
+          let a=lessonsForCourse.find(l=>l.unit===i&&l.index===j),ready=!!readyFor(a);
+          return `<a class="topic-link ${ready?'ready':''} ${viewed[a.id]||progress[a.id]?'complete':''} ${a.id===current.id?'selected':''}" href="${path(c.id,i,j)}" ${a.id===current.id?'aria-current="page"':''}>
+            <span class="mark">${viewed[a.id]||progress[a.id]?'✓':j+1}</span><span class="topic-link-copy"><small>${c.kind==='lab'?'Experiment':'Topic'} ${j+1}</small>${esc(t)}</span></a>`;
+        }).join('')}</div></details>`:''
     }).join('')}</div></aside>`;
   const status=authored?'Authored · faculty review pending':'Syllabus mapped · lesson pending';
-  const reader=`<main class="main-content"><div class="reader-toolbar"><div class="crumbs compact"><button class="btn small floating-toggle" data-action="mobile-menu" aria-label="Open course contents">☰ Contents</button><a href="#/semester/${c.semester}">${semLabel(c.semester)}</a><span>›</span><span>${esc(c.title)}</span></div>
-    <div class="toolbar-right"><button class="btn small" data-action="toggle-side">${sideClosed?'☰ Show outline':'☷ Hide outline'}</button></div></div>
-    <header class="lesson-heading"><div class="kicker">${esc(current.unitName)} · ${c.kind==='lab'?'Experiment':'Topic'} ${current.index+1}</div><h1>${esc(current.name)}</h1>
-      <div class="lesson-meta"><span class="pill ${authored?'':'draft'}">${status}</span><span class="pill">${c.kind==='lab'?'Lab Studio':'Textbook'}</span><span class="muted smalltext">${c.hours} contact hours / course</span></div>
-    </header>${authored?(c.kind==='lab'?renderLab(current,authored):renderTheory(current,authored)):renderPending(current,c)}
-    <div class="lesson-footer"><a class="btn" ${idx>0?`href="${path(c.id,lessonsForCourse[idx-1].unit,lessonsForCourse[idx-1].index)}"`:'href="#/semester/'+c.semester+'"'}>← ${idx>0?'Previous topic':'Subjects'}</a>
-       <button class="btn ${progress[current.id]?'':'primary'}" data-action="complete" data-lesson="${current.id}" ${authored?'':'disabled title="The lesson is not authored yet"'}>${progress[current.id]?'✓ Marked complete':'✓ Mark as learned'}</button>
-       ${idx+1<lessonsForCourse.length?`<a class="btn primary" href="${path(c.id,lessonsForCourse[idx+1].unit,lessonsForCourse[idx+1].index)}">Next topic →</a>`:`<a class="btn" href="#/semester/${c.semester}">Subject list →</a>`}</div>
-       <div class="feedback"><span class="muted smalltext">Was this explanation useful?</span><button class="btn small" data-action="feedback" data-rating="yes" data-lesson="${current.id}">Yes</button><button class="btn small" data-action="feedback" data-rating="no" data-lesson="${current.id}">Needs improvement</button><span class="muted smalltext" id="feedback-status">${feedback[current.id]?'Feedback stored on this device':''}</span></div>
-       <footer class="foot">Academic content is a learning aid; verify against your college instructor and the current prescribed syllabus. No user account is required. Local progress will not sync between devices.</footer></main>`;
-  layout(`<div class="course-layout">${sidebar}${reader}</div>`,'reader');
+  const next=lessonsForCourse[idx+1],prev=lessonsForCourse[idx-1];
+  const reader=`<main class="main-content"><div class="studio-reader-topline">
+      <div><a href="#/semester/${c.semester}">${esc(c.title)}</a><span>›</span><span>${esc(current.unitName)}</span><span>›</span><b>${c.kind==='lab'?'Experiment':'Topic'} ${idx+1}</b></div>
+      <div class="studio-topic-progress"><span>${c.kind==='lab'?'Experiment':'Topic'} ${idx+1} of ${lessonsForCourse.length}</span><i style="--progress:${100*(idx+1)/lessonsForCourse.length}%"></i>
+        <button class="btn small" type="button" data-action="toggle-side">${sideClosed?'Show':'Hide'} contents</button></div></div>
+    <div class="studio-next-top">${next?`<a class="studio-next-card" href="${path(c.id,next.unit,next.index)}"><small>NEXT ${c.kind==='lab'?'EXPERIMENT':'TOPIC'} →</small>${esc(next.name)}<small>${esc(c.units[next.unit].name)}</small></a>`:''}</div>
+    <div class="studio-unit-banner"><span class="studio-unit-badge">${c.kind==='lab'?'Section':'Unit'} ${ui+1}</span>
+      <div><small>Current ${c.kind==='lab'?'section':'unit'}</small><h2>${esc(current.unitName)}</h2></div></div>
+    <article class="studio-topic-canvas"><div class="studio-topic-title"><span class="studio-topic-tag">${c.kind==='lab'?'Experiment':'Topic'} ${current.index+1}</span>
+      <h1>${esc(current.name)}</h1></div><div class="studio-status">${status} · ${c.kind==='lab'?'Practical lab':'Textbook theory'}</div>
+      ${authored?(c.kind==='lab'?renderLab(current,authored):renderTheory(current,authored)):renderPending(current,c)}
+      <div class="lesson-footer"><a class="btn" href="${prev?path(c.id,prev.unit,prev.index):'#/semester/'+c.semester}">← ${prev?'Previous topic':'Subjects'}</a>
+        <button class="btn ${progress[current.id]?'':'primary'}" data-action="complete" data-lesson="${current.id}" ${authored?'':'disabled title="The lesson is not authored yet"'}>${progress[current.id]?'✓ Marked complete':'✓ Mark as learned'}</button>
+        ${next?`<a class="btn primary" href="${path(c.id,next.unit,next.index)}">Next topic →</a>`:`<a class="btn" href="#/semester/${c.semester}">Subject list →</a>`}</div>
+      <div class="feedback"><span class="muted smalltext">Was this explanation useful?</span><button class="btn small" data-action="feedback" data-rating="yes" data-lesson="${current.id}">Yes</button><button class="btn small" data-action="feedback" data-rating="no" data-lesson="${current.id}">Needs improvement</button><span class="muted smalltext" id="feedback-status">${feedback[current.id]?'Feedback stored on this device':''}</span></div>
+    </article><footer class="foot">Academic content is a learning aid; verify against your college instructor and the current prescribed syllabus. Progress is stored only on this device.</footer></main>`;
+  layout(`<div class="course-layout">${sidebar}${reader}</div>`,'reader',c);
   if(mobileOpen) app.querySelector('.sidebar.mobile-open')?.setAttribute('aria-modal','true');
 }
 
@@ -101,30 +142,33 @@ function renderPending(lesson,c){
 }
 
 function tabs(items){
-  if(!items.includes(tab))tab=items[0];
-  return `<nav class="content-tabs" aria-label="Lesson sections">${items.map(t=>`<button data-action="tab" data-tab="${t}" class="${tab===t?'current':''}" aria-current="${tab===t?'page':'false'}">${({theory:'Theory',diagram:'Diagram & example',practice:'Try it',industry:'Industry',quiz:'MCQs',exam:'Exam preparation',lab:'Experiment',code:'Code & run',viva:'Viva & checks'})[t]}</button>`).join('')}</nav>`;
+  return `<nav class="content-tabs" aria-label="Sections in this topic">${items.map(t=>`<button type="button" data-action="jump" data-target="topic-${t}">${({theory:'Theory',diagram:'Diagram',practice:'Try it',industry:'Industry',quiz:'MCQs',exam:'Exam',lab:'Experiment',code:'Code & run',viva:'Viva'})[t]}</button>`).join('')}</nav>`;
 }
 function para(s){return `<p>${fmt(s)}</p>`}
 
 function renderTheory(l,d){
-  const section=tab;
-  let body='';
-  if(section==='theory')body=`<article class="reader-card"><div class="kicker">What are we learning?</div><h2>${esc(d.question)}</h2>${para(d.opening)}
-    ${d.theory.map(([title,text])=>`<h3>${esc(title)}</h3>${para(text)}`).join('')}</article>`;
-  if(section==='diagram')body=`<article class="reader-card"><div class="kicker">Textbook visual</div><h2>See the concept work</h2>${renderDiagram(d.diagram)}</article>
-    <article class="reader-card"><h2>Guided worked example</h2><p><strong>${esc(d.worked.task)}</strong></p><ol class="step-list">${d.worked.steps.map(s=>`<li>${fmt(s)}</li>`).join('')}</ol><div class="note"><p><strong>Result:</strong> ${fmt(d.worked.answer)}</p></div></article>`;
-  if(section==='practice')body=`<article class="reader-card"><div class="kicker">Try it yourself</div><h2>Predict → test → explain</h2><p>${esc(d.worked.task)}</p><div class="note gold"><p>Write your prediction first. Then read or run the reference example according to the language shown.</p></div>
-    ${codePanel(d.code,d.language,`${l.course}:code`,true)}<div class="inline-actions"><button class="btn" data-action="reveal" data-id="${l.course}:${l.title}">Compare with worked solution</button></div>${revealed[`${l.course}:${l.title}`]?`<div class="note"><p>${fmt(d.worked.answer)}</p></div>`:''}</article>`;
-  if(section==='industry')body=`<article class="reader-card"><div class="kicker">Where this appears in the world</div><h2>From college to workplace</h2>${para(d.industry)}</article>`;
-  if(section==='quiz')body=`<div class="reader-card"><div class="kicker">5 four-option questions · explained answers</div><h2>Check your understanding</h2><p>Choose one option per question. Each response includes an explanation so you can learn from a mistake.</p></div>${d.quiz.map((q,i)=>question(l,q,i)).join('')}`;
-  if(section==='exam')body=`<article class="reader-card"><div class="kicker">University exam preparation</div><h2>2, 5 and 10-mark practice</h2><p>The following are original model questions aligned to the syllabus, not claimed to be previous-year university questions.</p>
-    ${d.exam.map((q,i)=>`<div class="exam-item"><h3>${[2,5,10][i]} marks · ${['Remember and define','Explain with a diagram/example','Develop and justify'][i]}</h3><p>${esc(q)}</p><button class="btn small" data-action="exam" data-id="${l.course}:${l.title}:${i}">${revealed[`${l.course}:${l.title}:${i}`]?'Hide study notes':'Show study notes'}</button>
-    ${revealed[`${l.course}:${l.title}:${i}`]?`<div class="note"><p>${i===0?fmt(d.theory[0][1]):i===1?fmt(d.theory.slice(0,2).map(x=>x[1]).join(' ')):fmt(d.theory.map(x=>x[1]).join(' ')+' Worked example: '+d.worked.steps.join(' ')+' Result: '+d.worked.answer)}</p></div>`:''}</div>`).join('')}</article>`;
-  return tabs(['theory','diagram','practice','industry','quiz','exam'])+body;
+  const sections=tabs(['theory','diagram','practice','industry','quiz','exam']);
+  const topicTheory=d.theory.map(([title,text])=>`<div class="theory-block"><h3>${esc(title)}</h3>${para(text)}</div>`).join('');
+  const questions=d.exam.map((q,i)=>`<div class="exam-item"><h3>${[2,5,10][i]} marks · ${['Remember and define','Explain with a diagram/example','Develop and justify'][i]}</h3>
+    <p>${esc(q)}</p><details><summary>Study notes</summary><div class="note"><p>${i===0?fmt(d.theory[0][1]):i===1?fmt(d.theory.slice(0,2).map(x=>x[1]).join(' ')):fmt(d.theory.map(x=>x[1]).join(' ')+' Worked example: '+d.worked.steps.join(' ')+' Result: '+d.worked.answer)}</p></div></details></div>`).join('');
+  return `${sections}
+    <section class="reader-card topic-anchor" id="topic-theory"><div class="kicker">Theory</div><h2>${esc(d.question)}</h2>${para(d.opening)}${topicTheory}</section>
+    <section class="reader-card topic-anchor" id="topic-diagram"><div class="kicker">Diagram &amp; example</div><h2>See the concept work</h2>
+      ${renderDiagram(d.diagram)}<div class="theory-block"><h3>Guided worked example</h3><p><strong>${esc(d.worked.task)}</strong></p>
+      <ol class="step-list">${d.worked.steps.map(s=>`<li>${fmt(s)}</li>`).join('')}</ol><div class="note"><p><strong>Result:</strong> ${fmt(d.worked.answer)}</p></div></div></section>
+    <section class="reader-card topic-anchor" id="topic-practice"><div class="kicker">Try it</div><h2>Predict → test → explain</h2>
+      <p>${esc(d.worked.task)}</p>${codePanel(d.code,d.language,`${l.courseId}:code`,true)}
+      <details class="studio-exam-group"><summary>Compare with worked solution <span>+</span></summary><div class="note"><p>${fmt(d.worked.answer)}</p></div></details></section>
+    <section class="reader-card topic-anchor" id="topic-industry"><div class="kicker">Industry connection</div><h2>From college to workplace</h2>${para(d.industry)}</section>
+    <section class="reader-card topic-anchor" id="topic-quiz"><div class="kicker">Topic assessment</div><h2>MCQ check</h2>
+      ${d.quiz.map((q,i)=>question(l,q,i)).join('')}</section>
+    <section class="reader-card topic-anchor" id="topic-exam"><div class="kicker">Exam preparation</div>
+      <details class="studio-exam-group"><summary>Model exam questions <span>2 · 5 · 10 marks ＋</span></summary>
+        <div><p>Original model questions aligned to the syllabus; they are not claimed to be previous-year questions.</p>${questions}</div></details></section>`;
 }
 
 function question(l,q,i){
-  let key=`${l.course}:${l.title}:${i}`,val=answers[key];
+  let key=`${l.courseId}:${l.name}:${i}`,val=answers[key];
   return `<section class="quiz-card"><h3>${i+1}. ${esc(q[0])}</h3><div class="quiz-options">${q[1].map((o,j)=>`<button class="quiz-option ${val===j?(j===q[2]?'correct':'wrong'):''}" data-action="answer" data-key="${esc(key)}" data-index="${j}" aria-pressed="${val===j}"><strong>${String.fromCharCode(65+j)}.</strong> ${esc(o)}</button>`).join('')}</div>${val!==undefined?`<div class="quiz-explain"><strong>${val===q[2]?'Correct.':'Review.'}</strong> ${esc(q[3])}</div>`:''}</section>`;
 }
 
@@ -135,11 +179,18 @@ function codePanel(code,language,key,editable){
 }
 
 function renderLab(l,d){
-  let body='';
-  if(tab==='lab')body=`<article class="reader-card"><div class="kicker">Practical experiment</div><h2>Aim and apparatus</h2>${para(d.aim)}<div class="note"><p><strong>Requirements:</strong> ${esc(d.requirements)}</p></div><h3>Procedure</h3><ol class="step-list">${d.steps.map(s=>`<li>${fmt(s)}</li>`).join('')}</ol><h3>Observation and expected result</h3><div class="run-output">${esc(d.expected)}</div><p>Record the actual result separately. Compare the observation with the predicted result and note any difference.</p></article>`;
-  if(tab==='code')body=`<article class="reader-card"><div class="kicker">Edit • run where supported • debug</div><h2>${esc(d.filename)}</h2><p>Edit the source and predict its output. A genuine browser runtime is provided for supported Python and SQLite exercises; Java requires a local JDK.</p>${codePanel(d.code,d.language,`${l.course}:code`,true)}</article>`;
-  if(tab==='viva')body=`<article class="reader-card"><div class="kicker">Lab record and troubleshooting</div><h2>Viva preparation</h2><ol>${d.viva.map(x=>`<li>${esc(x)}</li>`).join('')}</ol><h3>If the result differs</h3><ul>${d.faults.map(x=>`<li>${fmt(x)}</li>`).join('')}</ul><div class="note gold"><p><strong>Record format:</strong> Aim → Requirements → Algorithm/steps → Source → Sample input → Predicted output → Observed output → Result → Viva notes. Keep the program and observed result in your own lab record.</p></div></article>`;
-  return tabs(['lab','code','viva'])+body;
+  return `${tabs(['lab','code','viva'])}
+    <section class="reader-card topic-anchor" id="topic-lab"><div class="kicker">Practical experiment</div><h2>Aim and apparatus</h2>
+      ${para(d.aim)}<div class="theory-block"><h3>Requirements</h3><p>${esc(d.requirements)}</p></div>
+      <h3>Procedure</h3><ol class="step-list">${d.steps.map(s=>`<li>${fmt(s)}</li>`).join('')}</ol>
+      <h3>Observation and expected result</h3><div class="run-output">${esc(d.expected)}</div>
+      <p>Record the actual observation and compare it with the expected result.</p></section>
+    <section class="reader-card topic-anchor" id="topic-code"><div class="kicker">Code &amp; run</div><h2>${esc(d.filename)}</h2>
+      <p>Edit the source and test it with the runtime identified below.</p>${codePanel(d.code,d.language,`${l.courseId}:code`,true)}</section>
+    <section class="reader-card topic-anchor" id="topic-viva"><div class="kicker">Lab checks</div><h2>Viva preparation</h2>
+      <ol>${d.viva.map(x=>`<li>${esc(x)}</li>`).join('')}</ol><h3>If the result differs</h3>
+      <ul>${d.faults.map(x=>`<li>${fmt(x)}</li>`).join('')}</ul>
+      <div class="note gold"><p><strong>Lab record:</strong> Aim → Requirements → Steps → Code → Input → Predicted output → Observed output → Result → Viva notes.</p></div></section>`;
 }
 
 function rect(x,y,w,h,txt,fill='#1f3b44',stroke='#609a91',size=15){return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="13" fill="${fill}" stroke="${stroke}" stroke-width="2"/><text x="${x+w/2}" y="${y+h/2+5}" text-anchor="middle" fill="#e3f9f5" font-size="${size}" font-weight="650">${esc(txt)}</text>`}
@@ -173,6 +224,7 @@ function render(){
 }
 
 function getCode(key){const t=app.querySelector(`[data-editor="${CSS.escape(key)}"]`);return t?.value??''}
+function renderAtCurrentScroll(){const y=window.scrollY;render();window.scrollTo({top:y,behavior:'instant'})}
 function sourceFor(key){const [course]=key.split(':');if(key.endsWith(':code')){
   const cur=parseRouteLesson();const d=cur&&readyFor(cur);return d?.code??'';
 }return ''}
@@ -202,13 +254,14 @@ async function runSql(code,out){
 app.addEventListener('click',async(e)=>{
   let el=e.target.closest('[data-action]');if(!el)return;let action=el.dataset.action;
   if(action==='unavailable'){e.preventDefault();return}
-  if(action==='mobile-menu'){mobileOpen=!mobileOpen;render();return}
-  if(action==='toggle-side'){sideClosed=!sideClosed;mobileOpen=false;render();return}
-  if(action==='tab'){tab=el.dataset.tab;render();return}
-  if(action==='complete'){if(el.disabled)return;progress[el.dataset.lesson]=!progress[el.dataset.lesson];store(KEY,progress);render();return}
+  if(action==='semester'){const s=Number(el.dataset.semester);history.replaceState(null,'',`#/semester/${s}`);render();document.getElementById('studio-sem-overview')?.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(action==='jump'){document.getElementById(el.dataset.target)?.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(action==='mobile-menu'){mobileOpen=!mobileOpen;renderAtCurrentScroll();return}
+  if(action==='toggle-side'){sideClosed=!sideClosed;mobileOpen=false;renderAtCurrentScroll();return}
+  if(action==='complete'){if(el.disabled)return;progress[el.dataset.lesson]=!progress[el.dataset.lesson];store(KEY,progress);renderAtCurrentScroll();return}
   if(action==='feedback'){feedback[el.dataset.lesson]=el.dataset.rating;store(FEEDBACK,feedback);document.querySelector('#feedback-status').textContent='Feedback stored on this device';return}
-  if(action==='answer'){answers[el.dataset.key]=Number(el.dataset.index);render();return}
-  if(action==='reveal'||action==='exam'){revealed[el.dataset.id]=!revealed[el.dataset.id];render();return}
+  if(action==='answer'){answers[el.dataset.key]=Number(el.dataset.index);const current=parseRouteLesson(),spec=current&&readyFor(current),index=Number(el.dataset.key.split(':').at(-1));const card=el.closest('.quiz-card');if(card&&spec?.quiz?.[index])card.outerHTML=question(current,spec.quiz[index],index);else renderAtCurrentScroll();return}
+  if(action==='reveal'||action==='exam'){revealed[el.dataset.id]=!revealed[el.dataset.id];renderAtCurrentScroll();return}
   if(action==='copy'){const val=getCode(el.dataset.key)||sourceFor(el.dataset.key);try{await navigator.clipboard.writeText(val);el.textContent='Copied ✓'}catch{el.textContent='Select text to copy'}return}
   if(action==='reset-code'){let t=app.querySelector(`[data-editor="${CSS.escape(el.dataset.key)}"]`);if(t)t.value=sourceFor(el.dataset.key);return}
   if(action==='run'){let code=getCode(el.dataset.key),out=app.querySelector(`[data-output="${CSS.escape(el.dataset.key)}"]`);if(!out)return;if(el.dataset.language==='python')await runPython(code,out);else if(el.dataset.language==='sql')await runSql(code,out);return}
