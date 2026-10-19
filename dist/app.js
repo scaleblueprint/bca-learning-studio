@@ -52,7 +52,7 @@ function semesterView(s){
   const k = s===3||s===4?s:3;
   layout(`<main class="subject-page"><div class="crumbs"><a href="#/">← BCA home</a><span> / </span><span>${semLabel(k)}</span></div>
     <div class="page-intro"><div class="eyebrow">BCA · ${semLabel(k)} </div><h1>Choose a subject</h1><p>Open a subject directly into its course contents. Explore individual topics or experiments from the left outline.</p></div>
-    ${subjectGroup('Core theory',grouped(k,'theory'))}
+    ${subjectGroup('Core theory',grouped(k,'theory').filter(c=>!c.elective))}
     ${subjectGroup('Practical laboratory',grouped(k,'lab'),'Experiments stay in their own Lab Studio, separate from theory.')}
     ${subjectGroup('Discipline-specific elective · choose the prescribed option',curriculum.filter(c=>c.semester===k&&c.elective))}
     ${subjectGroup('Other curriculum components',grouped(k,'outline'),'The uploaded BCA syllabus lists these subjects but does not provide their detailed units.')}
